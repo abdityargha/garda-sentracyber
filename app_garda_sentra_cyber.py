@@ -1,8 +1,8 @@
 """
 GARDA - Sentra-Cyber
-UI final yang lebih rapi, terang, modern, dan stabil dirender di Streamlit.
+Versi deploy-ready untuk Streamlit Community Cloud.
 
-Jalankan:
+Jalankan lokal:
     streamlit run app_garda_sentra_cyber.py
 """
 
@@ -25,8 +25,6 @@ st.set_page_config(
 )
 
 BASE_DIR = Path(__file__).resolve().parent
-
-# Sesuaikan jika nama file berbeda
 LOGO_PATH = BASE_DIR / "logo_kemhan.png"
 BANNER_PATH = BASE_DIR / "banner_sentra_cyber.png"
 
@@ -40,9 +38,13 @@ def image_to_base64(image_path: Path) -> str:
     return base64.b64encode(image_path.read_bytes()).decode("utf-8")
 
 
+def get_api_key() -> str:
+    return st.secrets.get("GOOGLE_API_KEY", "")
+
+
 def get_llm(api_key: str):
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-2.5-flash-lite",
         google_api_key=api_key,
     )
 
@@ -102,9 +104,7 @@ def risk_level_from_answers(
 
 def badge(text: str):
     st.markdown(
-        f"""
-        <span class="garda-badge">{text}</span>
-        """,
+        f'<span class="garda-badge">{text}</span>',
         unsafe_allow_html=True,
     )
 
@@ -226,13 +226,6 @@ st.markdown(
         color: var(--muted) !important;
     }
 
-    section[data-testid="stSidebar"] input {
-        background: #ffffff !important;
-        color: var(--text) !important;
-        border: 1px solid #bfd0e0 !important;
-        border-radius: 12px !important;
-    }
-
     .stButton > button {
         background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
         color: white !important;
@@ -316,14 +309,6 @@ st.markdown(
         font-weight: 600;
         font-size: 0.82rem;
         margin: 0 0.4rem 0.45rem 0;
-    }
-
-    .section-card {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        padding: 1.25rem;
-        box-shadow: var(--shadow);
     }
 
     .section-soft {
@@ -419,18 +404,6 @@ with st.sidebar:
     st.markdown("## GARDA")
     st.caption("Sistem edukasi keamanan informasi Sentra-Cyber")
 
-    st.markdown("### 🔐 Konfigurasi")
-    st.caption("Masukkan Google API Key dari Google AI Studio. Kunci hanya disimpan sementara di session browser.")
-
-    api_key_input = st.text_input("Google API Key", type="password", key="api_key_input")
-
-    if st.button("Simpan API Key", use_container_width=True):
-        if not api_key_input:
-            st.error("API Key tidak boleh kosong.")
-        else:
-            st.session_state["GOOGLE_API_KEY"] = api_key_input
-            st.success("API Key tersimpan di session.")
-
     st.markdown("---")
     st.markdown("### 🎯 Mode Interaksi")
     mode = st.radio(
@@ -458,13 +431,13 @@ with st.sidebar:
         st.rerun()
 
 
-if "GOOGLE_API_KEY" not in st.session_state:
-    st.info("Simpan Google API Key di sidebar untuk mengaktifkan GARDA.")
+api_key = get_api_key()
+if not api_key:
+    st.error("Secret GOOGLE_API_KEY belum ditemukan. Tambahkan di Settings → Secrets pada Streamlit Cloud.")
     st.stop()
 
-
 start_or_update_system_prompt(mode)
-llm = get_llm(st.session_state["GOOGLE_API_KEY"])
+llm = get_llm(api_key)
 
 
 # =========================================================
@@ -474,7 +447,6 @@ if BANNER_PATH.exists():
     st.image(str(BANNER_PATH), use_container_width=True)
 else:
     st.info("Banner belum ditemukan. Simpan file banner di folder yang sama dengan nama: banner_sentra_cyber.png")
-
 
 st.markdown("")
 
@@ -588,7 +560,6 @@ with right:
         unsafe_allow_html=True,
     )
 
-
 st.markdown("")
 
 
@@ -660,12 +631,25 @@ with chat_tab:
 
         with st.chat_message("assistant"):
             with st.spinner("GARDA sedang menyusun jawaban..."):
-                response = llm.invoke(st.session_state["messages_history"])
-                if not isinstance(response, AIMessage):
-                    response = AIMessage(content=str(response))
+                try:
+                    response = llm.invoke(st.session_state["messages_history"])
+                    if not isinstance(response, AIMessage):
+                        response = AIMessage(content=str(response))
 
-                st.session_state["messages_history"].append(response)
-                st.markdown(response.content)
+                    st.session_state["messages_history"].append(response)
+                    st.markdown(response.content)
+
+                except Exception as e:
+                    err = str(e)
+
+                    if "429" in err or "ResourceExhausted" in err or "quota" in err.lower():
+                        st.info(
+                            "Kuota API sedang mencapai batas. "
+                            "Tunggu sekitar 20–30 detik lalu coba lagi. "
+                            "Jika masih muncul, cek limit aktif di Google AI Studio atau billing project Anda."
+                        )
+                    else:
+                        st.error(f"Terjadi kesalahan: {err}")
 
 
 # =========================================================

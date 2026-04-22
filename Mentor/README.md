@@ -6,7 +6,7 @@
 ---
 
 <p align="center">
-  <img src="screenshot-home.jpg" alt="Tampilan Mentor Bela Negara ID" width="800">
+  <img src="assets/screenshot-home.jpg" alt="Tampilan Mentor Bela Negara ID" width="800">
 </p>
 
 ---
@@ -40,3 +40,4 @@
 ```bash
 git clone https://github.com/USERNAME/mentor-bela-negara-id.git
 cd mentor-bela-negara-id
+
